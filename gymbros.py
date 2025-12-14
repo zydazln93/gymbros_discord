@@ -7,27 +7,24 @@ from datetime import datetime, date, timedelta
 from typing import List, Any, Optional
 
 # ---------------------------
-# LOAD ENVIRONMENT VARIABLES (FIXED FOR RAILWAY MYSQL NAMES)
+# LOAD ENVIRONMENT VARIABLES
 # ---------------------------
 load_dotenv()
-
-# Use generic environment variable names
-DB_HOST = os.getenv("DB_HOST") 
+DB_HOST = os.getenv("DB_HOST")
 DB_PORT = os.getenv("DB_PORT")
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_NAME = os.getenv("DB_NAME")
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN") 
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 
-# Check for generic variable names
 required_vars = ["DB_HOST", "DB_USER", "DB_PASSWORD", "DB_NAME", "DISCORD_TOKEN"]
 missing = [var for var in required_vars if not os.getenv(var)]
 if missing:
-    # This check is vital for deployment on Railway! (Line 27)
+    # This check is vital for deployment on Railway!
     raise ValueError(f"Missing required environment variables: {', '.join(missing)}")
 
 # ---------------------------
-# CREATE DATABASE ENGINE (UNCHANGED)
+# CREATE DATABASE ENGINE
 # ---------------------------
 # Note: On Railway, you must use the internal database variables defined in the service settings
 DB_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}{f':{DB_PORT}' if DB_PORT else ''}/{DB_NAME}"
@@ -696,6 +693,4 @@ async def view_progress(ctx):
 # RUN BOT
 # ---------------------------
 if __name__ == "__main__":
-
     bot.run(DISCORD_TOKEN)
-
