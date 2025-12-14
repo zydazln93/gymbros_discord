@@ -12,15 +12,18 @@ class DatabaseError(Exception):
     pass
 
 # ---------------------------
-# LOAD ENVIRONMENT VARIABLES (Simplified for DATABASE_URL)
+# LOAD ENVIRONMENT VARIABLES (Using individual variables)
 # ---------------------------
 load_dotenv()
 
-# We assume DATABASE_URL is now used for the connection string
-DB_URL = os.getenv("DATABASE_URL")
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT")
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_NAME = os.getenv("DB_NAME")
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 
-required_vars = ["DATABASE_URL", "DISCORD_TOKEN"]
+required_vars = ["DB_HOST", "DB_USER", "DB_PASSWORD", "DB_NAME", "DISCORD_TOKEN"]
 missing = [var for var in required_vars if not os.getenv(var)]
 if missing:
     # This check remains vital for initial deployment failure
@@ -29,7 +32,9 @@ if missing:
 # ---------------------------
 # CREATE DATABASE ENGINE
 # ---------------------------
-# The DB_URL should now contain the full string (e.g., mysql+pymysql://user:pass@host:port/db)
+# Build the DB URL from individual components
+DB_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}{f':{DB_PORT}' if DB_PORT else ''}/{DB_NAME}"
+
 engine = create_engine(
     DB_URL,
     # These settings help prevent connection timeouts and keep the pool healthy
@@ -73,7 +78,7 @@ def start_session(user_id: int, user_name: str):
 
 def get_active_session():
     try:
-        with engine.connect() as conn: # Use connect() for SELECT operations
+        with engine.connect() as conn:
             result = conn.execute(
                 text("""
                     SELECT session_id, date, start_time, notes
@@ -294,11 +299,10 @@ async def on_command_error(ctx, error):
         await ctx.send("❌ An unexpected error occurred while processing your command! Check console logs.")
 
 # ---------------------------
-# Aesthetic Table Helper (Unchanged)
+# Aesthetic Table Helper 
 # ---------------------------
 
 def create_table(headers: List[str], rows: List[List[Any]]) -> str:
-    # ... (Keep the original create_table logic here - it is purely string manipulation and robust)
     processed_rows = []
     for row in rows:
         # Convert None/null values to a standard string representation
@@ -349,17 +353,15 @@ async def ping(ctx):
         # A simple DB check can be included here for extra health check:
         # with engine.connect() as conn:
         #     conn.execute(text("SELECT 1"))
-        await ctx.send("🏓 Pong! (DB Connection assumed active 🟢)")
-    except DatabaseError as e:
-        await ctx.send(f"🏓 Pong! (DB Connection failed ❌)")
-    except Exception as e:
-        await ctx.send(f"❌ Internal error on ping: {type(e).__name__}")
+        await ctx.send("🏓 Pong! (Bot is responsive 🟢)")
+    except Exception:
+        # If the bot is responsive but DB check fails (not critical for ping)
+        await ctx.send("🏓 Pong! (DB Connection failed ❌)")
 
 
 @bot.command()
 async def command(ctx):
     """Display all available bot commands with examples"""
-    # ... (Command list logic remains the same, it does not use the DB, so it's safe)
     embed = discord.Embed(
         title="🤖 Fitness Tracker Bot - Command List",
         description="Here are all available commands:",
@@ -608,7 +610,7 @@ async def session(ctx, session_id: int):
 @bot.command()
 async def today(ctx):
     try:
-        with engine.connect() as conn: # Use connect() for SELECT operations
+        with engine.connect() as conn:
             sessions = conn.execute(
                 text("""
                     SELECT session_id, start_time, end_time, total_calories
@@ -642,7 +644,7 @@ async def today(ctx):
 async def history(ctx):
     """Displays last 5 completed sessions in an aesthetic table"""
     try:
-        with engine.connect() as conn: # Use connect() for SELECT operations
+        with engine.connect() as conn:
             sessions = conn.execute(
                 text("""
                     SELECT session_id, date, start_time, end_time, total_calories
@@ -707,7 +709,7 @@ async def history(ctx):
 async def personal_records(ctx):
     """Displays your all-time Personal Records (PRs)"""
     try:
-        records = get_personal_records() # DB call wrapped
+        records = get_personal_records()
         
         if not records:
             await ctx.reply("🏅 No weightlifting logs found yet! Use `!add_lift` to start tracking PRs.")
@@ -750,7 +752,7 @@ async def log_weight(ctx, weight: float):
         return
     
     try:
-        log_id = log_weight_db(weight_int) # DB call wrapped
+        log_id = log_weight_db(weight_int)
         
         await ctx.reply(f"✅ **Weight logged!** (ID: `{log_id}`)\n⚖️ Current Weight: **{weight_int} KG** recorded for {date.today()}.\nNote: Your table only stores weight as an integer (KG).")
     except DatabaseError as e:
@@ -763,7 +765,7 @@ async def log_weight(ctx, weight: float):
 async def view_progress(ctx):
     """Displays your last 10 logged body weight entries."""
     try:
-        history = get_weight_history() # DB call wrapped
+        history = get_weight_history()
         
         if not history:
             await ctx.reply("📈 No weight logs found. Use `!log_weight <weight_kg>` to start tracking.")
