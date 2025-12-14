@@ -11,19 +11,19 @@ from typing import List, Any, Optional
 # ---------------------------
 load_dotenv()
 
-# Use the specific environment variable names provided by Railway's MySQL Service
-DB_HOST = os.getenv("MYSQLHOST")
-DB_PORT = os.getenv("MYSQLPORT") # Railway provides this as a string
-DB_USER = os.getenv("MYSQLUSER")
-DB_PASSWORD = os.getenv("MYSQLPASSWORD")
-DB_NAME = os.getenv("MYSQLDATABASE")
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN") # This still needs to be manually added
+# Use generic environment variable names
+DB_HOST = os.getenv("DB_HOST") 
+DB_PORT = os.getenv("DB_PORT")
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_NAME = os.getenv("DB_NAME")
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN") 
 
-# Check if required DB variables are present (using the new names)
-required_db_vars = ["MYSQLHOST", "MYSQLUSER", "MYSQLPASSWORD", "MYSQLDATABASE", "DISCORD_TOKEN"]
-missing = [var for var in required_db_vars if not os.getenv(var)]
+# Check for generic variable names
+required_vars = ["DB_HOST", "DB_USER", "DB_PASSWORD", "DB_NAME", "DISCORD_TOKEN"]
+missing = [var for var in required_vars if not os.getenv(var)]
 if missing:
-    # This check is vital for deployment on Railway!
+    # This check is vital for deployment on Railway! (Line 27)
     raise ValueError(f"Missing required environment variables: {', '.join(missing)}")
 
 # ---------------------------
@@ -698,3 +698,4 @@ async def view_progress(ctx):
 if __name__ == "__main__":
 
     bot.run(DISCORD_TOKEN)
+
