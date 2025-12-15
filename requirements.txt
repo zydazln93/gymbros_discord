@@ -2,3 +2,5 @@ discord.py
 python-dotenv
 SQLAlchemy
 pymysql
+# Newly added:
+cryptography
