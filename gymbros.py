@@ -496,7 +496,10 @@ async def add_lift(ctx, exercise: str, muscle: str, sets: int, reps: int, weight
             await ctx.reply("❌ No active session found.")
             return
         
-        add_weightlift_db(active[0], ctx.author.id, str(ctx.author), exercise, muscle, sets, reps, weight, notes)
+        lift_id = add_weightlift_db(
+            active[0], ctx.author.id, str(ctx.author), exercise, muscle, sets, reps, weight, notes
+        )
+        
         await ctx.reply(
                     f"✅ **Lift logged!** (ID: `{lift_id}`)\n"
                     f"💪 Exercise: **{exercise}**\n"
@@ -642,6 +645,7 @@ async def view_progress(ctx):
 # ---------------------------
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
+
 
 
 
