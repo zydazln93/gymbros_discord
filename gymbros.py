@@ -475,7 +475,16 @@ async def add_cardio(ctx, machine: str, duration: int, distance: float = None, c
             return
         
         insert_cardio_db(active[0], ctx.author.id, str(ctx.author), machine, duration, distance, calories, notes)
-        await ctx.reply(f"✅ **Cardio logged!** 🏃 Machine: **{machine}** | ⏱️ **{duration}m**")
+
+        # Display zero instead of None if you leave the calories section blank
+        cal_display = calories if calories is not None else 0
+        
+        await ctx.reply(
+            f"✅ **Cardio logged!**\n" 
+            f"🏃 Machine: **{machine}**\n"
+            f"⏱️ **{duration} min**\n"
+            f"🔥 Calories Burned: **{cal_display} calories**"
+        )
     except DatabaseError as e:
         await ctx.reply(f"❌ {e}")
 
@@ -488,7 +497,12 @@ async def add_lift(ctx, exercise: str, muscle: str, sets: int, reps: int, weight
             return
         
         add_weightlift_db(active[0], ctx.author.id, str(ctx.author), exercise, muscle, sets, reps, weight, notes)
-        await ctx.reply(f"✅ **Lift logged!** 💪 **{exercise}**: {sets}×{reps} @ {weight}kg")
+        await ctx.reply(
+                    f"✅ **Lift logged!** (ID: `{lift_id}`)\n"
+                    f"💪 Exercise: **{exercise}**\n"
+                    f"🎯 Muscle: **{muscle}**\n"
+                    f"📊 **{sets}**×**{reps}** @ **{weight}kg**"
+                )
     except DatabaseError as e:
         await ctx.reply(f"❌ {e}")
 
@@ -628,5 +642,6 @@ async def view_progress(ctx):
 # ---------------------------
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
+
 
 
