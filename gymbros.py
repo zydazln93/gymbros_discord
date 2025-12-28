@@ -520,6 +520,7 @@ async def current(ctx):
 async def history(ctx):
     try:
         with engine.connect() as conn:
+            # We fetch the raw data from the gym_sessions table
             sessions = conn.execute(
                 text("""
                     SELECT session_id, date, start_time, end_time, total_calories
@@ -536,15 +537,40 @@ async def history(ctx):
 
         headers = ["ID", "Date", "Dur(m)", "Cals"]
         rows = []
+        
         for s in sessions:
-            rows.append([f"#{s[0]}", s[1].strftime("%b %d"), "-", s[4] if s[4] else "-"])
+            session_id, s_date, s_start, s_end, s_cals = s
+            
+            # --- DURATION CALCULATION ---
+            # Convert timedelta/string to a usable format to calculate minutes
+            try:
+                # Combining with a dummy date to subtract times safely
+                start_dt = datetime.combine(date.today(), (datetime.min + s_start).time())
+                end_dt = datetime.combine(date.today(), (datetime.min + s_end).time())
+                
+                # If the session crossed midnight
+                if end_dt < start_dt:
+                    end_dt += timedelta(days=1)
+                
+                duration_mins = (end_dt - start_dt).seconds // 60
+            except:
+                duration_mins = "???" # Fallback if data is corrupted
+
+            # Append the actual calculated duration instead of "-"
+            rows.append([
+                f"#{session_id}", 
+                s_date.strftime("%b %d"), 
+                f"{duration_mins}", 
+                s_cals if s_cals is not None else "0"
+            ])
         
         table = create_table(headers, rows)
         embed = discord.Embed(title="📜 Workout History", color=discord.Color.dark_theme())
         embed.description = f"```text\n{table}\n```"
         await ctx.send(embed=embed)
     except Exception as e:
-        await ctx.reply(f"❌ Error: {e}")
+        print(f"History Error: {e}")
+        await ctx.reply(f"❌ Error generating history: {e}")
 
 @bot.command()
 async def pr(ctx):
@@ -592,3 +618,4 @@ async def view_progress(ctx):
 # ---------------------------
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
+
