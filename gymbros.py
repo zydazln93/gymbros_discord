@@ -583,8 +583,18 @@ async def pr(ctx):
         headers = ["Exercise", "Max (kg)", "Date"]
         rows = [[r[0][:15], r[1], r[2].strftime("%b %d") if r[2] else "-"] for r in records]
         table = create_table(headers, rows)
+        
+        # Create the embed
         embed = discord.Embed(title="🏆 Personal Records", color=discord.Color.gold())
-        embed.description = f"```text\n{table}\n```"
+        
+        # Add "User A's personal record" at the very top of the description
+        # We use ctx.author.display_name to get their current nickname or username
+        user_text = f"**This is {ctx.author.display_name}'s personal records**\n"
+        embed.description = f"{user_text}```text\n{table}\n```"
+        
+        # Optional: Add their avatar icon next to the title for a cleaner look
+        embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.display_avatar.url)
+
         await ctx.send(embed=embed)
     except DatabaseError as e:
         await ctx.reply(f"❌ {e}")
@@ -618,4 +628,5 @@ async def view_progress(ctx):
 # ---------------------------
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
+
 
