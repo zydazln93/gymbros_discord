@@ -51,20 +51,20 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # ROBUST DATABASE HELPER FUNCTIONS (Multi-User Updated)
 # ---------------------------
 
-def start_session(discord_id: int, discord_username: str):
+def start_session(discord_id: int, discord_name: str):
     try:
         with engine.begin() as conn:
             result = conn.execute(
                 text("""
-                    INSERT INTO gym_sessions (discord_id, discord_username, date, start_time, notes)
-                    VALUES (:discord_id, :discord_username, :session_date, :start_time, :notes)
+                    INSERT INTO gym_sessions (discord_id, discord_name, date, start_time, notes)
+                    VALUES (:discord_id, :discord_name, :session_date, :start_time, :notes)
                 """),
                 {
                     "discord_id": discord_id,
-                    "discord_username": discord_username,
+                    "discord_name": discord_name,
                     "session_date": date.today(),
                     "start_time": datetime.now().strftime("%H:%M:%S"),
-                    "notes": f"Started by {discord_username}"
+                    "notes": f"Started by {discord_name}"
                 }
             )
             return result.lastrowid
@@ -113,20 +113,20 @@ def end_session(session_id: int, calories: int):
         print(f"DB Error in end_session: {e}")
         raise DatabaseError("Could not update the session due to database issue.")
 
-def insert_cardio_db(session_id: int, discord_id: int, discord_username: str, machine_type: str, duration: int, 
+def insert_cardio_db(session_id: int, discord_id: int, discord_name: str, machine_type: str, duration: int, 
                      distance: float = None, calories: int = None, notes: str = None):
     try:
         with engine.begin() as conn:
             result = conn.execute(
                 text("""
                     INSERT INTO cardio_logs 
-                    (session_id, discord_id, discord_username, date, machine_type, duration_minutes, distance, calories_burned, notes)
-                    VALUES (:session_id, :discord_id, :discord_username, :date, :machine_type, :duration, :distance, :calories, :notes)
+                    (session_id, discord_id, discord_name, date, machine_type, duration_minutes, distance, calories_burned, notes)
+                    VALUES (:session_id, :discord_id, :discord_name, :date, :machine_type, :duration, :distance, :calories, :notes)
                 """),
                 {
                     "session_id": session_id,
                     "discord_id": discord_id,
-                    "discord_username": discord_username,
+                    "discord_name": discord_name,
                     "date": date.today(),
                     "machine_type": machine_type,
                     "duration": duration,
@@ -140,20 +140,20 @@ def insert_cardio_db(session_id: int, discord_id: int, discord_username: str, ma
         print(f"DB Error in insert_cardio_db: {e}")
         raise DatabaseError("Could not log cardio due to database issue.")
 
-def add_weightlift_db(session_id: int, discord_id: int, discord_username: str, exercise_name: str, muscle_group: str,
+def add_weightlift_db(session_id: int, discord_id: int, discord_name: str, exercise_name: str, muscle_group: str,
                       sets: int, reps: int, weight: int, notes: str = None):
     try:
         with engine.begin() as conn:
             result = conn.execute(
                 text("""
                     INSERT INTO weightlift_logs
-                    (session_id, discord_id, discord_username, date, exercise_name, muscle_group, sets, reps, weight, notes)
-                    VALUES (:session_id, :discord_id, :discord_username, :date, :exercise, :muscle, :sets, :reps, :weight, :notes)
+                    (session_id, discord_id, discord_name, date, exercise_name, muscle_group, sets, reps, weight, notes)
+                    VALUES (:session_id, :discord_id, :discord_name, :date, :exercise, :muscle, :sets, :reps, :weight, :notes)
                 """),
                 {
                     "session_id": session_id,
                     "discord_id": discord_id,
-                    "discord_username": discord_username,
+                    "discord_name": discord_name,
                     "date": date.today(),
                     "exercise": exercise_name,
                     "muscle": muscle_group,
@@ -645,6 +645,7 @@ async def view_progress(ctx):
 # ---------------------------
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
+
 
 
 
