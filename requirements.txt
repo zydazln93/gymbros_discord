@@ -1,6 +1,8 @@
-discord.py
-python-dotenv
-SQLAlchemy
-pymysql
-# Newly added:
-cryptography
+streamlit==1.31.0
+plotly==5.18.0
+pandas==2.1.4
+sqlalchemy==2.0.25
+pymysql==1.1.0
+python-dotenv==1.0.0
+cryptography==41.0.7
+discord.py==2.3.2
