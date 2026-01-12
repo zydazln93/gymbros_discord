@@ -13,6 +13,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, date, timedelta
+from sqlalchemy import text
 
 # Import all functions from your existing gymbros.py
 try:
@@ -35,13 +36,33 @@ except ImportError as e:
     st.stop()
 
 # ---------------------------
+# AUTHENTICATION FUNCTIONS
+# ---------------------------
+
+def authenticate_user(username: str, password: str):
+    """Authenticate user with username and password from user_credentials table"""
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(
+                text("""
+                    SELECT discord_id, username 
+                    FROM user_credentials 
+                    WHERE username = :username AND password = :password
+                """),
+                {"username": username, "password": password}
+            ).fetchone()
+            return result  # Returns (discord_id, username) or None
+    except Exception as e:
+        st.error(f"Authentication error: {e}")
+        return None
+
+# ---------------------------
 # HELPER FUNCTIONS FOR STREAMLIT
 # ---------------------------
 
 def get_history(discord_id: int, limit: int = 5):
     """Get workout history (Streamlit-specific helper)"""
     try:
-        from sqlalchemy import text
         with engine.connect() as conn:
             sessions = conn.execute(
                 text("""
@@ -59,7 +80,6 @@ def get_history(discord_id: int, limit: int = 5):
 def test_db_connection():
     """Test and wake up the database"""
     try:
-        from sqlalchemy import text
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         return True
@@ -111,14 +131,17 @@ CARDIO_MACHINES = [
 ]
 
 # ---------------------------
-# CUSTOM CSS
+# MOBILE-RESPONSIVE CSS
 # ---------------------------
 
 st.markdown("""
 <style>
+    /* Mobile-first responsive design */
     .main {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     }
+    
+    /* Button styling - works on all screen sizes */
     .stButton>button {
         width: 100%;
         background: linear-gradient(90deg, #00C9FF 0%, #92FE9D 100%);
@@ -126,24 +149,122 @@ st.markdown("""
         font-weight: bold;
         border-radius: 10px;
         border: none;
-        padding: 10px;
+        padding: 12px 20px;
         transition: 0.3s;
+        font-size: 16px;
     }
+    
     .stButton>button:hover {
-        transform: scale(1.05);
+        transform: scale(1.02);
         box-shadow: 0 5px 15px rgba(0,0,0,0.3);
     }
+    
+    /* Metric cards - responsive sizing */
     div[data-testid="stMetricValue"] {
-        font-size: 28px;
+        font-size: clamp(20px, 4vw, 28px);
         font-weight: bold;
     }
+    
+    div[data-testid="stMetricLabel"] {
+        font-size: clamp(12px, 2.5vw, 14px);
+    }
+    
+    /* Success box - mobile friendly */
     .success-box {
-        padding: 20px;
+        padding: 15px;
         border-radius: 10px;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
         text-align: center;
         margin: 10px 0;
+    }
+    
+    .success-box h3 {
+        font-size: clamp(16px, 4vw, 20px);
+        margin-bottom: 10px;
+    }
+    
+    .success-box p {
+        font-size: clamp(14px, 3vw, 16px);
+        margin: 5px 0;
+    }
+    
+    /* Input fields - better mobile experience */
+    .stTextInput>div>div>input,
+    .stNumberInput>div>div>input,
+    .stSelectbox>div>div>select {
+        font-size: 16px !important;  /* Prevents iOS zoom on focus */
+        padding: 10px;
+    }
+    
+    /* Tabs - mobile friendly */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 5px;
+        overflow-x: auto;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        font-size: clamp(12px, 3vw, 14px);
+        padding: 8px 12px;
+        white-space: nowrap;
+    }
+    
+    /* Data tables - horizontal scroll on mobile */
+    .stDataFrame {
+        overflow-x: auto;
+    }
+    
+    /* Form spacing on mobile */
+    .stForm {
+        padding: 10px;
+    }
+    
+    /* Sidebar adjustments */
+    [data-testid="stSidebar"] {
+        min-width: 250px;
+    }
+    
+    /* Mobile-specific adjustments */
+    @media (max-width: 768px) {
+        .stButton>button {
+            padding: 15px 10px;
+            font-size: 14px;
+        }
+        
+        h1 {
+            font-size: 24px !important;
+        }
+        
+        h2 {
+            font-size: 20px !important;
+        }
+        
+        h3 {
+            font-size: 18px !important;
+        }
+        
+        /* Stack columns vertically on mobile */
+        [data-testid="column"] {
+            width: 100% !important;
+            flex: 100% !important;
+        }
+        
+        /* Better spacing on mobile */
+        .element-container {
+            margin-bottom: 10px;
+        }
+    }
+    
+    /* Very small phones */
+    @media (max-width: 480px) {
+        .stButton>button {
+            font-size: 13px;
+            padding: 12px 8px;
+        }
+        
+        div[data-testid="stMetricValue"] {
+            font-size: 18px;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -172,22 +293,27 @@ with st.sidebar:
     
     if st.session_state.user_id is None:
         st.subheader("👤 Login")
-        user_id_input = st.text_input("User ID (Discord ID)")
-        username_input = st.text_input("Username")
         
-        if st.button("Login"):
-            if user_id_input and username_input:
-                try:
-                    st.session_state.user_id = int(user_id_input)
-                    st.session_state.username = username_input
-                    st.rerun()
-                except ValueError:
-                    st.error("User ID must be a number!")
-            else:
-                st.error("Please fill in both fields!")
+        with st.form("login_form"):
+            username_input = st.text_input("Username", placeholder="Enter your username")
+            password_input = st.text_input("Password", type="password", placeholder="Enter your password")
+            login_button = st.form_submit_button("🔐 Login", use_container_width=True)
+            
+            if login_button:
+                if username_input and password_input:
+                    user = authenticate_user(username_input, password_input)
+                    if user:
+                        st.session_state.user_id = user[0]  # discord_id
+                        st.session_state.username = user[1]  # username
+                        st.success("✅ Login successful!")
+                        st.rerun()
+                    else:
+                        st.error("❌ Invalid username or password!")
+                else:
+                    st.error("⚠️ Please fill in both fields!")
     else:
         st.success(f"👋 Welcome, **{st.session_state.username}**!")
-        if st.button("Logout"):
+        if st.button("🚪 Logout", use_container_width=True):
             st.session_state.user_id = None
             st.session_state.username = None
             st.rerun()
@@ -223,8 +349,8 @@ if st.session_state.user_id is None:
 else:
     # Main tabs
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "🏠 Dashboard", "💪 Log Workout", "⚖️ Weight Tracker", 
-        "📊 Progress", "🏆 Personal Records"
+        "🏠 Home", "💪 Log", "⚖️ Weight", 
+        "📊 Progress", "🏆 PRs"
     ])
     
     # ---------------------------
@@ -233,50 +359,52 @@ else:
     with tab1:
         st.title("🏠 Dashboard")
         
-        col1, col2, col3 = st.columns(3)
+        # Metrics in responsive columns
+        col1, col2, col3 = st.columns([1, 1, 1])
         
         with col1:
             try:
                 active = get_active_session(st.session_state.user_id)
                 if active:
-                    st.metric("Active Session", f"#{active[0]}", "🟢 In Progress")
+                    st.metric("Session", f"#{active[0]}", "🟢")
                 else:
-                    st.metric("Active Session", "None", "⚪ Idle")
+                    st.metric("Session", "None", "⚪")
             except:
-                st.metric("Active Session", "Error", "❌")
+                st.metric("Session", "Error", "❌")
         
         with col2:
             try:
                 history = get_history(st.session_state.user_id, 1)
                 if history:
-                    st.metric("Last Workout", history[0][1].strftime("%b %d"), f"{history[0][4] or 0} cal")
+                    st.metric("Last", history[0][1].strftime("%b %d"), f"{history[0][4] or 0} cal")
                 else:
-                    st.metric("Last Workout", "N/A", "")
+                    st.metric("Last", "N/A", "")
             except:
-                st.metric("Last Workout", "Error", "")
+                st.metric("Last", "Error", "")
         
         with col3:
             try:
                 weight_hist = get_weight_history(st.session_state.user_id)
                 if weight_hist:
-                    st.metric("Current Weight", f"{weight_hist[0][1]} kg", "")
+                    st.metric("Weight", f"{weight_hist[0][1]} kg", "")
                 else:
-                    st.metric("Current Weight", "N/A", "")
+                    st.metric("Weight", "N/A", "")
             except:
-                st.metric("Current Weight", "Error", "")
+                st.metric("Weight", "Error", "")
         
         st.markdown("---")
         
-        # Session Control
+        # Session Control - stacked on mobile
         st.subheader("🎯 Session Control")
-        col1, col2 = st.columns(2)
+        
+        col1, col2 = st.columns([1, 1])
         
         with col1:
-            if st.button("▶️ Start New Session", use_container_width=True):
+            if st.button("▶️ Start Session", use_container_width=True, key="start_btn"):
                 try:
                     active = get_active_session(st.session_state.user_id)
                     if active:
-                        st.error(f"⚠️ You already have an active session (ID: {active[0]})")
+                        st.error(f"⚠️ Active session: #{active[0]}")
                     else:
                         session_id = start_session(st.session_state.user_id, st.session_state.username)
                         st.success(f"✅ Session #{session_id} started!")
@@ -285,21 +413,40 @@ else:
                     st.error(f"❌ {e}")
         
         with col2:
-            if st.button("⏹️ End Active Session", use_container_width=True):
-                try:
-                    active = get_active_session(st.session_state.user_id)
-                    if not active:
-                        st.error("❌ No active session found")
-                    else:
-                        with st.form("end_session_form"):
-                            calories = st.number_input("Total Calories Burned 🔥", min_value=0, value=0)
-                            submitted = st.form_submit_button("Confirm End Session")
-                            if submitted:
-                                end_session(active[0], calories)
-                                st.success(f"✅ Session #{active[0]} ended! Total: {calories} cal")
-                                st.rerun()
-                except DatabaseError as e:
-                    st.error(f"❌ {e}")
+            try:
+                active = get_active_session(st.session_state.user_id)
+                if active:
+                    if st.button("⏹️ End Session", use_container_width=True, key="end_btn"):
+                        st.session_state.show_end_form = True
+                else:
+                    st.button("⏹️ End Session", use_container_width=True, disabled=True, key="end_btn_disabled")
+            except:
+                pass
+        
+        # End session form (appears below buttons)
+        if hasattr(st.session_state, 'show_end_form') and st.session_state.show_end_form:
+            try:
+                active = get_active_session(st.session_state.user_id)
+                if active:
+                    with st.form("end_session_form"):
+                        st.write(f"Ending Session #{active[0]}")
+                        calories = st.number_input("Calories Burned 🔥", min_value=0, value=0)
+                        col_a, col_b = st.columns(2)
+                        with col_a:
+                            submitted = st.form_submit_button("✅ Confirm", use_container_width=True)
+                        with col_b:
+                            cancelled = st.form_submit_button("❌ Cancel", use_container_width=True)
+                        
+                        if submitted:
+                            end_session(active[0], calories)
+                            st.success(f"✅ Session #{active[0]} ended! Total: {calories} cal")
+                            st.session_state.show_end_form = False
+                            st.rerun()
+                        if cancelled:
+                            st.session_state.show_end_form = False
+                            st.rerun()
+            except DatabaseError as e:
+                st.error(f"❌ {e}")
         
         st.markdown("---")
         
@@ -309,16 +456,16 @@ else:
             history = get_history(st.session_state.user_id, 5)
             if history:
                 df = pd.DataFrame(history, columns=["ID", "Date", "Start", "End", "Calories"])
-                df['Duration (min)'] = df.apply(lambda row: 
+                df['Dur(m)'] = df.apply(lambda row: 
                     ((datetime.combine(date.today(), (datetime.min + row['End']).time()) - 
                       datetime.combine(date.today(), (datetime.min + row['Start']).time())).seconds // 60) 
                     if row['End'] else 0, axis=1)
-                df_display = df[['ID', 'Date', 'Duration (min)', 'Calories']]
-                st.dataframe(df_display, use_container_width=True)
+                df_display = df[['ID', 'Date', 'Dur(m)', 'Calories']]
+                st.dataframe(df_display, use_container_width=True, hide_index=True)
             else:
                 st.info("No completed sessions yet!")
         except Exception as e:
-            st.error(f"Error loading history: {e}")
+            st.error(f"Error: {e}")
     
     # ---------------------------
     # TAB 2: LOG WORKOUT
@@ -330,26 +477,20 @@ else:
         try:
             active = get_active_session(st.session_state.user_id)
             if not active:
-                st.warning("⚠️ Please start a session first from the Dashboard!")
+                st.warning("⚠️ Start a session first!")
             else:
-                st.success(f"✅ Logging to Session #{active[0]}")
+                st.success(f"✅ Session #{active[0]}")
                 
-                workout_type = st.radio("Choose workout type:", ["🏋️ Weightlifting", "🏃 Cardio"], horizontal=True)
+                workout_type = st.radio("Type:", ["🏋️ Lift", "🏃 Cardio"], horizontal=True)
                 
                 st.markdown("---")
                 
-                if workout_type == "🏋️ Weightlifting":
-                    st.subheader("💪 Log Weightlifting Exercise")
+                if workout_type == "🏋️ Lift":
+                    st.subheader("💪 Log Lift")
                     
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        muscle_group = st.selectbox("Choose Muscle Group:", list(MUSCLE_GROUPS.keys()))
-                    
-                    with col2:
-                        # Remove emoji from muscle group key for cleaner display
-                        clean_muscle = muscle_group.split(" ", 1)[1]
-                        exercise = st.selectbox("Choose Exercise:", MUSCLE_GROUPS[muscle_group])
+                    muscle_group = st.selectbox("Muscle Group:", list(MUSCLE_GROUPS.keys()))
+                    clean_muscle = muscle_group.split(" ", 1)[1]
+                    exercise = st.selectbox("Exercise:", MUSCLE_GROUPS[muscle_group])
                     
                     col3, col4, col5 = st.columns(3)
                     
@@ -360,7 +501,7 @@ else:
                     with col5:
                         weight = st.number_input("Weight (kg)", min_value=0, value=20)
                     
-                    notes = st.text_area("Notes (optional)")
+                    notes = st.text_area("Notes (optional)", max_chars=200)
                     
                     if st.button("✅ Log Lift", use_container_width=True):
                         try:
@@ -370,34 +511,29 @@ else:
                             )
                             st.markdown(f"""
                             <div class="success-box">
-                                <h3>✅ Lift Logged Successfully!</h3>
-                                <p><strong>{exercise}</strong> - {sets}×{reps} @ {weight}kg</p>
-                                <p>Log ID: #{lift_id}</p>
+                                <h3>✅ Lift Logged!</h3>
+                                <p><strong>{exercise}</strong></p>
+                                <p>{sets}×{reps} @ {weight}kg</p>
                             </div>
                             """, unsafe_allow_html=True)
                         except DatabaseError as e:
                             st.error(f"❌ {e}")
                 
                 else:  # Cardio
-                    st.subheader("🏃 Log Cardio Exercise")
+                    st.subheader("🏃 Log Cardio")
                     
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        machine = st.selectbox("Choose Machine/Activity:", CARDIO_MACHINES)
-                    
-                    with col2:
-                        duration = st.number_input("Duration (minutes)", min_value=1, value=30)
+                    machine = st.selectbox("Activity:", CARDIO_MACHINES)
+                    duration = st.number_input("Duration (min)", min_value=1, value=30)
                     
                     col3, col4 = st.columns(2)
                     
                     with col3:
-                        distance = st.number_input("Distance (km) - Optional", min_value=0.0, value=0.0, step=0.1)
+                        distance = st.number_input("Distance (km)", min_value=0.0, value=0.0, step=0.1)
                     
                     with col4:
-                        calories = st.number_input("Calories Burned - Optional", min_value=0, value=0)
+                        calories = st.number_input("Calories", min_value=0, value=0)
                     
-                    notes = st.text_area("Notes (optional)")
+                    notes = st.text_area("Notes (optional)", max_chars=200)
                     
                     if st.button("✅ Log Cardio", use_container_width=True):
                         try:
@@ -411,9 +547,9 @@ else:
                             )
                             st.markdown(f"""
                             <div class="success-box">
-                                <h3>✅ Cardio Logged Successfully!</h3>
-                                <p><strong>{clean_machine}</strong> - {duration} min</p>
-                                <p>🔥 {calories} calories burned</p>
+                                <h3>✅ Cardio Logged!</h3>
+                                <p><strong>{clean_machine}</strong></p>
+                                <p>{duration} min • {calories} cal</p>
                             </div>
                             """, unsafe_allow_html=True)
                         except DatabaseError as e:
@@ -426,45 +562,44 @@ else:
     # TAB 3: WEIGHT TRACKER
     # ---------------------------
     with tab3:
-        st.title("⚖️ Weight Tracker")
+        st.title("⚖️ Weight")
         
-        col1, col2 = st.columns([1, 2])
+        st.subheader("Log Weight")
+        weight_input = st.number_input("Weight (kg)", min_value=0.0, value=70.0, step=0.1)
         
-        with col1:
-            st.subheader("Log New Weight")
-            weight_input = st.number_input("Weight (kg)", min_value=0.0, value=70.0, step=0.1)
-            
-            if st.button("✅ Log Weight", use_container_width=True):
-                try:
-                    log_id = log_weight_db(st.session_state.user_id, weight_input)
-                    st.success(f"✅ Weight logged: {weight_input} kg")
-                    st.rerun()
-                except DatabaseError as e:
-                    st.error(f"❌ {e}")
-        
-        with col2:
-            st.subheader("📈 Weight Progress Chart")
+        if st.button("✅ Log Weight", use_container_width=True):
             try:
-                weight_hist = get_weight_history(st.session_state.user_id)
-                if weight_hist:
-                    df = pd.DataFrame(weight_hist, columns=["Date", "Weight (kg)"])
-                    df = df.sort_values("Date")
-                    
-                    fig = px.line(df, x="Date", y="Weight (kg)", 
-                                  markers=True, 
-                                  title="Weight Trend Over Time")
-                    fig.update_traces(line_color='#00C9FF', marker=dict(size=10))
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.info("No weight logs yet!")
-            except Exception as e:
-                st.error(f"Error loading weight history: {e}")
+                log_id = log_weight_db(st.session_state.user_id, weight_input)
+                st.success(f"✅ {weight_input} kg logged!")
+                st.rerun()
+            except DatabaseError as e:
+                st.error(f"❌ {e}")
+        
+        st.markdown("---")
+        st.subheader("📈 Progress")
+        
+        try:
+            weight_hist = get_weight_history(st.session_state.user_id)
+            if weight_hist:
+                df = pd.DataFrame(weight_hist, columns=["Date", "Weight (kg)"])
+                df = df.sort_values("Date")
+                
+                fig = px.line(df, x="Date", y="Weight (kg)", 
+                              markers=True, 
+                              title="Weight Trend")
+                fig.update_traces(line_color='#00C9FF', marker=dict(size=8))
+                fig.update_layout(height=400)
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("No weight logs yet!")
+        except Exception as e:
+            st.error(f"Error: {e}")
     
     # ---------------------------
     # TAB 4: PROGRESS
     # ---------------------------
     with tab4:
-        st.title("📊 Workout Progress")
+        st.title("📊 Progress")
         
         try:
             sessions = get_history(st.session_state.user_id, 20)
@@ -472,7 +607,6 @@ else:
                 df = pd.DataFrame(sessions, columns=["ID", "Date", "Start", "End", "Calories"])
                 df['Date'] = pd.to_datetime(df['Date'])
                 
-                # Calories chart
                 fig = go.Figure()
                 fig.add_trace(go.Bar(
                     x=df['Date'],
@@ -481,43 +615,42 @@ else:
                     name='Calories'
                 ))
                 fig.update_layout(
-                    title="Calories Burned Per Session",
+                    title="Calories Per Session",
                     xaxis_title="Date",
                     yaxis_title="Calories",
-                    template="plotly_dark"
+                    template="plotly_dark",
+                    height=400
                 )
                 st.plotly_chart(fig, use_container_width=True)
             else:
                 st.info("No workout data yet!")
         except Exception as e:
-            st.error(f"Error loading progress: {e}")
+            st.error(f"Error: {e}")
     
     # ---------------------------
     # TAB 5: PERSONAL RECORDS
     # ---------------------------
     with tab5:
-        st.title("🏆 Personal Records")
+        st.title("🏆 PRs")
         
         try:
             prs = get_personal_records(st.session_state.user_id)
             if prs:
-                df = pd.DataFrame(prs, columns=["Exercise", "Max Weight (kg)", "Date"])
+                df = pd.DataFrame(prs, columns=["Exercise", "Max (kg)", "Date"])
                 
-                # Display in columns
-                col1, col2 = st.columns(2)
+                st.dataframe(df, use_container_width=True, hide_index=True)
                 
-                with col1:
-                    st.dataframe(df, use_container_width=True)
+                st.markdown("---")
                 
-                with col2:
-                    # Top 5 PRs chart
-                    top_5 = df.head(5)
-                    fig = px.bar(top_5, x="Exercise", y="Max Weight (kg)",
-                                 color="Max Weight (kg)",
-                                 color_continuous_scale="Viridis",
-                                 title="Top 5 Personal Records")
-                    st.plotly_chart(fig, use_container_width=True)
+                # Top 5 PRs chart
+                top_5 = df.head(5)
+                fig = px.bar(top_5, x="Exercise", y="Max (kg)",
+                             color="Max (kg)",
+                             color_continuous_scale="Viridis",
+                             title="Top 5 PRs")
+                fig.update_layout(height=400)
+                st.plotly_chart(fig, use_container_width=True)
             else:
-                st.info("🏅 No personal records yet! Start logging workouts to see your PRs!")
+                st.info("🏅 No PRs yet!")
         except DatabaseError as e:
             st.error(f"❌ {e}")
