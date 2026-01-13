@@ -87,6 +87,26 @@ def test_db_connection():
         st.error(f"⚠️ Database is waking up... Please refresh in 10 seconds.")
         return False
 
+# Point 3: Function to log food intake
+def log_food_intake_db(discord_id, entry_date, meal_name, protein, carbs, fats):
+    """Inserts food data into food_intake table"""
+    try:
+        calories = (protein * 4) + (carbs * 4) + (fats * 9)
+        with engine.connect() as conn:
+            conn.execute(
+                text("""
+                    INSERT INTO food_intake (discord_id, date, meal_name, calories, protein_g, carbs_g, fats_g)
+                    VALUES (:uid, :date, :meal, :cal, :prot, :carb, :fat)
+                """),
+                {"uid": discord_id, "date": entry_date, "meal": meal_name, 
+                 "cal": calories, "prot": protein, "carb": carbs, "fat": fats}
+            )
+            conn.commit()
+        return True
+    except Exception as e:
+        st.error(f"Error logging food: {e}")
+        return False
+
 # ---------------------------
 # EXERCISE DATABASE
 # ---------------------------
@@ -134,8 +154,14 @@ CARDIO_MACHINES = [
 # MOBILE-RESPONSIVE CSS
 # ---------------------------
 
+# Point 1 Fix: CSS to remove "Press Enter to submit form"
 st.markdown("""
 <style>
+    /* Hides the 'Press Enter to submit form' text that covers characters */
+    div[data-testid="stForm"] p {
+        display: none !important;
+    }
+    
     /* Mobile-first responsive design */
     .main {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -269,10 +295,14 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# Point 4: Chart config to disable zoom features
+PLOT_CONFIG = {'scrollZoom': False, 'displayModeBar': False, 'staticPlot': False}
+
 # ---------------------------
 # SESSION STATE INITIALIZATION
 # ---------------------------
 
+# Point 1: Keeping state active keeps user logged in while browser is open
 if 'user_id' not in st.session_state:
     st.session_state.user_id = None
 if 'username' not in st.session_state:
@@ -347,10 +377,10 @@ if st.session_state.user_id is None:
     - 📊 View progress and personal records
     """)
 else:
-    # Main tabs
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "🏠 Home", "💪 Log", "⚖️ Weight", 
-        "📊 Progress", "🏆 PRs"
+    # Point 2, 3, 5: Added Library, Food, and Help tabs
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+        "🏠 Home", "💪 Log", "🥗 Food", "📖 Library", "⚖️ Weight", 
+        "📊 Progress", "🏆 PRs", "❓ Help"
     ])
     
     # ---------------------------
@@ -557,11 +587,43 @@ else:
         
         except DatabaseError as e:
             st.error(f"❌ {e}")
-    
+
     # ---------------------------
-    # TAB 3: WEIGHT TRACKER
+    # TAB 3: FOOD INTAKE
     # ---------------------------
     with tab3:
+        st.title("🥗 Food Intake")
+        with st.form("food_form"):
+            # Point 3: Calendar format date input
+            f_date = st.date_input("Select Date", value=date.today())
+            f_meal = st.text_input("Meal Name")
+            c1, c2, c3 = st.columns(3)
+            with c1: f_prot = st.number_input("Proteins (g)", 0.0)
+            with c2: f_carb = st.number_input("Carbs (g)", 0.0)
+            with c3: f_fats = st.number_input("Fats (g)", 0.0)
+            
+            if st.form_submit_button("✅ Log Meal"):
+                if f_meal:
+                    log_food_intake_db(st.session_state.user_id, f_date, f_meal, f_prot, f_carb, f_fats)
+                    st.success("Meal logged!")
+                else:
+                    st.error("Please enter a meal name.")
+
+    # ---------------------------
+    # TAB 4: MUSCLE GROUP LIBRARY
+    # ---------------------------
+    with tab4:
+        st.title("📖 Exercise Library")
+        # Point 2: Dropdown for muscle groups that runs even without sessions
+        lib_muscle = st.selectbox("Browse Muscle Groups", list(MUSCLE_GROUPS.keys()))
+        st.write(f"### Recommended Exercises for {lib_muscle}:")
+        for ex in MUSCLE_GROUPS[lib_muscle]:
+            st.write(f"- {ex}")
+
+    # ---------------------------
+    # TAB 5: WEIGHT TRACKER
+    # ---------------------------
+    with tab5:
         st.title("⚖️ Weight")
         
         st.subheader("Log Weight")
@@ -589,16 +651,17 @@ else:
                               title="Weight Trend")
                 fig.update_traces(line_color='#00C9FF', marker=dict(size=8))
                 fig.update_layout(height=400)
-                st.plotly_chart(fig, use_container_width=True)
+                # Point 4: Chart with autoscale and no zoom
+                st.plotly_chart(fig, use_container_width=True, config=PLOT_CONFIG)
             else:
                 st.info("No weight logs yet!")
         except Exception as e:
             st.error(f"Error: {e}")
     
     # ---------------------------
-    # TAB 4: PROGRESS
+    # TAB 6: PROGRESS
     # ---------------------------
-    with tab4:
+    with tab6:
         st.title("📊 Progress")
         
         try:
@@ -621,16 +684,17 @@ else:
                     template="plotly_dark",
                     height=400
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                # Point 4: Chart with autoscale and no zoom
+                st.plotly_chart(fig, use_container_width=True, config=PLOT_CONFIG)
             else:
                 st.info("No workout data yet!")
         except Exception as e:
             st.error(f"Error: {e}")
     
     # ---------------------------
-    # TAB 5: PERSONAL RECORDS
+    # TAB 7: PERSONAL RECORDS
     # ---------------------------
-    with tab5:
+    with tab7:
         st.title("🏆 PRs")
         
         try:
@@ -649,8 +713,27 @@ else:
                              color_continuous_scale="Viridis",
                              title="Top 5 PRs")
                 fig.update_layout(height=400)
-                st.plotly_chart(fig, use_container_width=True)
+                # Point 4: Chart with autoscale and no zoom
+                st.plotly_chart(fig, use_container_width=True, config=PLOT_CONFIG)
             else:
                 st.info("🏅 No PRs yet!")
         except DatabaseError as e:
             st.error(f"❌ {e}")
+
+    # ---------------------------
+    # TAB 8: HELP
+    # ---------------------------
+    with tab8:
+        st.title("❓ Help & Navigation")
+        st.markdown("""
+        ### Welcome to your Fitness Tracker!
+        Here is how to navigate the site:
+        
+        1. **🏠 Home**: Start and End your gym sessions here. You can also see your last workout stats.
+        2. **💪 Log**: Once a session is started, come here to record your lifting or cardio.
+        3. **🥗 Food**: Log your daily meals and macros. Use the calendar to select the date.
+        4. **📖 Library**: Check exercise recommendations for different muscle groups anytime.
+        5. **⚖️ Weight**: Track your body weight over time.
+        6. **📊 Progress**: View charts of your calorie burn and consistency.
+        7. **🏆 PRs**: See your all-time best lifts.
+        """)
